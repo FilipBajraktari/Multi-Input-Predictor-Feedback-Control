@@ -25,7 +25,6 @@ class Unicycle:
 
         # Initialize predictor state
         self.P = self.predictor()
-        print(self.P)
 
     @staticmethod
     def dynamics(X, U, dt):
