@@ -1,8 +1,8 @@
-import os
 from datetime import datetime
 
 import h5py
 import numpy as np
+from tqdm import tqdm
 
 from unicycle import Unicycle
 from utils import sample_init_state, simulate_system
@@ -23,7 +23,7 @@ def main():
     with h5py.File(filename, 'w') as f:
         sample_cnt = 0
         nmb_of_sim = 1
-        for _ in range(nmb_of_sim):
+        for _ in tqdm(range(nmb_of_sim)):
 
             # Execute simulation
             X0 = sample_init_state()
@@ -39,9 +39,15 @@ def main():
                 sample_cnt += 1
 
                 group.create_dataset('X', data=states[i])
-                for k in range(len(NDs)):
+                for k in range(len(delays)):
                     group.create_dataset(f'U{k}', data=controls[i-NDs[k]:i, k])
                 group.create_dataset('P', data=states[i+NDs[-1]])
+
+        # Add global attributes
+        f.attrs['n_states'] = len(sample_init_state())
+        f.attrs['m_inputs'] = len(delays)
+        f.attrs['num_points'] = NDs[-1]
+        f.attrs['creation_date'] = timestamp
 
 if __name__ == "__main__":
     main()
