@@ -2,33 +2,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from unicycle import Unicycle
-
+from utils import simulate_system
 
 # Simulation Params
 dt = 1e-4
-T = 20
+T = 10
 t = np.arange(0, T + dt, dt)
 N = t.shape[0]
-D1, D2 = 0.25, 1
-ND1, ND2 = int(D1 / dt), int(D2 / dt)
-
-def simulate_system(sys: Unicycle):
-    states = np.zeros((N, 3))
-    controls = np.zeros((N-1, 2))
-
-    states[0] = sys.X
-    for i in range(1, N):
-        controls[i-1] = sys.controller(t[i-1])
-        states[i], _ = sys.step(controls[i-1], t[i-1])
-    return states, controls
+delays = [0.25, 1]
+NDs = [int(delay / dt) for delay in delays]
 
 def main():
 
     # Simulation
     X0 = np.array([1, 1, 1])
-    init_inputs = (np.zeros(ND1), np.zeros(ND2))
+    init_inputs = [np.zeros(NDi) for NDi in NDs]
     sys = Unicycle(X0, init_inputs, dt)
-    states, controls = simulate_system(sys)
+    states, controls = simulate_system(sys, t)
 
     # Plot Graphics
     fig = plt.figure(figsize=(10, 6))
