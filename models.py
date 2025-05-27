@@ -2,20 +2,11 @@ import h5py
 import torch
 import torch.nn as nn
 from neuralop.models import FNO
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, random_split
 from tqdm import tqdm
 
 from utils import preprocess_control_inputs
 
-
-class NeuralPredictor(torch.nn.Module):
-    def __init__(self, n_state: int, n_input: int, seq_len: int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.n_state = n_state
-        self.n_input = n_input
-        self.seq_len = seq_len
-
-        self.mse_loss = torch.nn.MSELoss()
     
 class FNOProjection(torch.nn.Module):
     def __init__(self, n_states, m_inputs, num_points, width=64, modes=16):
@@ -31,17 +22,17 @@ class FNOProjection(torch.nn.Module):
             hidden_channels=width,
         )
 
-    def forward(self, state, controls, prediction):
+    def forward(self, state, controls):
         """
         Inputs:
             - state:   (batch_size, n)
             - control: (batch_size, m, num_points)
         """
         combined = torch.cat(
-            (state.expand(-1, -1, self.num_points), controls),
+            (state.unsqueeze(-1).expand(-1, -1, self.num_points), controls),
             dim=1,
         )
-        return self.fno(combined)
+        return self.fno(combined)[..., -1]
     
 class PredictorOperatorDataset(Dataset):
     def __init__(self, file_path):
@@ -59,25 +50,84 @@ class PredictorOperatorDataset(Dataset):
         with h5py.File(self.file_path, 'r') as f:
             sample_key = self.keys_list[idx]
             sample = f[sample_key]
-            X = torch.tensor(sample['X'][:], dtype=torch.float32).unsqueeze(-1)
-            # U = torch.stack([
-            #     torch.tensor(sample[f'U{i}'][:], dtype=torch.float32)
-            #     for i in range(self.m_inputs)
-            # ])
+            X = torch.tensor(sample['X'][:], dtype=torch.float32)
             U = preprocess_control_inputs([
                 torch.tensor(sample[f'U{i}'][:], dtype=torch.float32)
                 for i in range(self.m_inputs)
             ])
-            P = torch.tensor(sample['P'][:], dtype=torch.float32).unsqueeze(-1)
+            P = torch.tensor(sample['P'][:], dtype=torch.float32)
 
         return X, U, P
+    
+def get_data_loaders(dataset: Dataset):
+    # Define split sizes
+    train_size = int(0.7 * len(dataset))
+    val_size = int(0.15 * len(dataset))
+    test_size = len(dataset) - train_size - val_size
+
+    # Split the dataset
+    train_dataset, val_dataset, test_dataset = random_split(
+        dataset, [train_size, val_size, test_size]
+    )
+
+    # Create DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    return train_loader, val_loader, test_loader
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--epochs', type=int, default=10,
+                       help='number of epochs to train')
+    parser.add_argument('--batch_size', type=int, default=32,
+                       help='input batch size for training')
+    args = parser.parse_args()
+
     dataset = PredictorOperatorDataset("data/const_delay.h5")
+    train_loader, val_loader, test_loader = get_data_loaders(dataset)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = FNOProjection(
         n_states=dataset.n_states,
         m_inputs=dataset.m_inputs,
         num_points=dataset.num_points,
-    )
-    X, U, P = dataset[0]
-    print(model(X.unsqueeze(0), U.unsqueeze(0), P.unsqueeze(0)))
+    ).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.MSELoss()
+    
+    for epoch in range(args.epochs):
+        for batch_idx, (state, controls, prediction) in enumerate(train_loader):
+            # Move data to device
+            state = state.to(device)
+            controls = controls.to(device)
+            prediction = prediction.to(device)
+
+            # Forward pass
+            outputs = model(state, controls)
+            loss = criterion(outputs, prediction)
+            
+            # Backward pass and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            # Print training progress
+            if (batch_idx+1) % 100 == 0:
+                print(f'Epoch [{epoch+1}/{args.epochs}], Step [{batch_idx+1}/{len(train_loader)}], Loss: {loss.item():.6f}')
+
+        # Validation
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for state, controls, prediction in val_loader:
+                state = state.to(device)
+                controls = controls.to(device)
+                prediction = prediction.to(device)
+                outputs = model(state, controls)
+                val_loss += criterion(outputs, prediction).item()
+        
+        print(f'Epoch [{epoch+1}/{args.epochs}], Validation Loss: {val_loss/len(val_loader):.6f}')

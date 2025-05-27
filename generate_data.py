@@ -17,12 +17,11 @@ NDs = [int(delay / dt) for delay in delays]
 
 def main():
     timestamp = datetime.now().strftime("%Y_%m_%d_%H:%M:%S")
-    # filename = f"data/const_delay_{timestamp}.h5"
     filename = f"data/const_delay.h5"
 
     with h5py.File(filename, 'w') as f:
         sample_cnt = 0
-        nmb_of_sim = 1
+        nmb_of_sim = 5000
         for _ in tqdm(range(nmb_of_sim)):
 
             # Execute simulation
