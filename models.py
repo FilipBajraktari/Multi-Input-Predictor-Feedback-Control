@@ -3,17 +3,41 @@ import torch
 import torch.nn as nn
 from neuralop.models import FNO
 from torch.utils.data import DataLoader, Dataset, random_split
-from tqdm import tqdm
 
 from utils import preprocess_control_inputs
 
-    
-class FNOProjection(torch.nn.Module):
-    def __init__(self, n_states, m_inputs, num_points, width=64, modes=16):
+
+class NeuralPredictor(nn.Module):
+    def __init__(self, n_states, m_inputs, num_points):
         super().__init__()
         self.n_states = n_states
         self.m_inputs = m_inputs
         self.num_points = num_points
+
+    def save(self, path):
+        torch.save({
+            'state_dict': self.state_dict(),
+            'n_states': self.n_states,
+            'm_inputs': self.m_inputs,
+            'num_points': self.num_points,
+        }, path)
+
+    @classmethod
+    def load(cls, path, device='cpu'):
+        checkpoint = torch.load(path, weights_only=False)
+        model = cls(
+            n_states=checkpoint['n_states'],
+            m_inputs=checkpoint['m_inputs'],
+            num_points=checkpoint['num_points'],
+        ).to(device)
+        model.load_state_dict(checkpoint['state_dict'], strict=False)
+
+        return model
+
+class FNOProjection(NeuralPredictor):
+
+    def __init__(self, n_states, m_inputs, num_points, width=128, modes=20):
+        super().__init__(n_states, m_inputs, num_points)
 
         self.fno = FNO(
             n_modes=(modes,),
@@ -27,14 +51,22 @@ class FNOProjection(torch.nn.Module):
         Inputs:
             - state:   (batch_size, n)
             - control: (batch_size, m, num_points)
+
+        Returns:
+            - prediction: (batch_size, n, num_points)
         """
         combined = torch.cat(
             (state.unsqueeze(-1).expand(-1, -1, self.num_points), controls),
             dim=1,
         )
-        return self.fno(combined)[..., -1]
+        return self.fno(combined)
     
+    def __str__(self):
+        return "FNO"
+
+
 class PredictorOperatorDataset(Dataset):
+
     def __init__(self, file_path):
         self.file_path = file_path
         with h5py.File(file_path, 'r') as f:
@@ -50,16 +82,17 @@ class PredictorOperatorDataset(Dataset):
         with h5py.File(self.file_path, 'r') as f:
             sample_key = self.keys_list[idx]
             sample = f[sample_key]
-            X = torch.tensor(sample['X'][:], dtype=torch.float32)
+            X = torch.tensor(sample['X'][:])
             U = preprocess_control_inputs([
-                torch.tensor(sample[f'U{i}'][:], dtype=torch.float32)
-                for i in range(self.m_inputs)
+                torch.tensor(sample[f'U{i}'][:]) for i in range(self.m_inputs)
             ])
-            P = torch.tensor(sample['P'][:], dtype=torch.float32)
+            P = torch.tensor(sample['P'][:])
 
         return X, U, P
-    
-def get_data_loaders(dataset: Dataset):
+
+
+def get_data_loaders(dataset: Dataset, batch_size: int):
+
     # Define split sizes
     train_size = int(0.7 * len(dataset))
     val_size = int(0.15 * len(dataset))
@@ -71,63 +104,12 @@ def get_data_loaders(dataset: Dataset):
     )
 
     # Create DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
 
+
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--epochs', type=int, default=10,
-                       help='number of epochs to train')
-    parser.add_argument('--batch_size', type=int, default=32,
-                       help='input batch size for training')
-    args = parser.parse_args()
-
-    dataset = PredictorOperatorDataset("data/const_delay.h5")
-    train_loader, val_loader, test_loader = get_data_loaders(dataset)
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = FNOProjection(
-        n_states=dataset.n_states,
-        m_inputs=dataset.m_inputs,
-        num_points=dataset.num_points,
-    ).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    criterion = nn.MSELoss()
-    
-    for epoch in range(args.epochs):
-        for batch_idx, (state, controls, prediction) in enumerate(train_loader):
-            # Move data to device
-            state = state.to(device)
-            controls = controls.to(device)
-            prediction = prediction.to(device)
-
-            # Forward pass
-            outputs = model(state, controls)
-            loss = criterion(outputs, prediction)
-            
-            # Backward pass and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            # Print training progress
-            if (batch_idx+1) % 100 == 0:
-                print(f'Epoch [{epoch+1}/{args.epochs}], Step [{batch_idx+1}/{len(train_loader)}], Loss: {loss.item():.6f}')
-
-        # Validation
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for state, controls, prediction in val_loader:
-                state = state.to(device)
-                controls = controls.to(device)
-                prediction = prediction.to(device)
-                outputs = model(state, controls)
-                val_loss += criterion(outputs, prediction).item()
-        
-        print(f'Epoch [{epoch+1}/{args.epochs}], Validation Loss: {val_loss/len(val_loader):.6f}')
+    ...

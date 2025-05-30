@@ -2,26 +2,28 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from system import System
-
 
 def sample_init_state():
     x = np.random.uniform(-5, 5)
     y = np.random.uniform(-5, 5)
     theta = np.random.uniform(-np.pi, np.pi)
-    return np.array([x, y, theta])
+    return np.array([x, y, theta], dtype=np.float32)
 
-def simulate_system(sys: System, t):
+def simulate_system(system, t):
     N = t.shape[0]
-    states = np.zeros((N, 3))
-    controls = np.zeros((N-1, 2))
+    states = np.zeros((3, N), dtype=np.float32)
+    controls = np.zeros((2, N-1), dtype=np.float32)
+    P = np.zeros((3, 2, N), dtype=np.float32)
+    P_hat = np.zeros((3, 2, N), dtype=np.float32)
 
-    states[0] = sys.X
+    states[:, 0] = system.X
+    P[:,:,0] = system.P
+    P_hat[:,:,0] = system.P_hat
     for i in range(1, N):
-        controls[i-1] = sys.controller(t[i-1])
-        states[i], _ = sys.step(controls[i-1], t[i-1])
+        controls[:, i-1] = system.controller(t[i-1])
+        states[:, i], P[:,:,i], P_hat[:,:,i] = system.step(controls[:, i-1], t[i-1])
 
-    return states, controls
+    return states, controls, P, P_hat
 
 def preprocess_control_inputs(inputs):
     max_len = max(input.shape[0] for input in inputs)
