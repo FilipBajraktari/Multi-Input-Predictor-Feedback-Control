@@ -7,7 +7,7 @@ TODO: Abstract from the paper (potentially modified to suits the needs)
 ## Getting Started - Installation, Package Versioning, Datasets, and Models.
 - To get started, please setup your virtual envrionment ([Virtual Env tutorial](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/)) and install the corresponding packages and versions given in `requirements.txt`.
 - Additionally, we have published both the dataset and models on huggingface. Please clone the repositories below following the instructions on huggingface and place the resulting
-files in the dataset and models folders of this repository (See below for structure). 
+files in the dataset and models folders (See below for structure). 
   - [Hugging face: Dataset](https://huggingface.co/datasets/FilipBajraktari/MultiInputPredictorFeedbackNeuralOperator)
   - [Hugging face: Models](https://huggingface.co/FilipBajraktari/MultiInputPredictorFeedbackNeuralOperator)
  
@@ -29,7 +29,7 @@ files in the dataset and models folders of this repository (See below for struct
 
 
 ## Assistance / Troubleshooting
-If you have any issues with any of the notebooks or models in this repo, feel free to create an issue in this github repo or email lbhan@ucsd.edu and I am more than happy to assist! 
+If you have any issues with any of the notebooks or models in this repo, feel free to create an issue in this github repo or email bajraktarifilip@gmail.com and I am more than happy to assist! 
 
 ### Citation 
 If you found this work useful or interesting for your own research, we would appreciate if you could cite our work:
