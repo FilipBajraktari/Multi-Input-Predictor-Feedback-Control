@@ -1,43 +1,60 @@
+from dataclasses import dataclass
+from pathlib import Path
+import tomli
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import ExponentialLR
 
 import wandb
-from models import FNOProjection, PredictorOperatorDataset, get_data_loaders
+from models import ModelConfig, PredictorOperatorDataset, get_data_loaders, get_model_class
 
 
-def train(
-        epochs: int,
-        lr: float,
-        batch_size: int,
-        data_path: str
-):
-    dataset = PredictorOperatorDataset(data_path)
-    train_loader, val_loader, test_loader = get_data_loaders(dataset, batch_size)
+@dataclass
+class ModelTrainingConfig:
+    model: ModelConfig
+    epochs: int
+    lr: float
+    weight_decay: float
+    gamma: float
+    batch_size: int
+    dataset: str
 
+
+def train(config: ModelTrainingConfig):
+
+    # Load dataset
+    abs_dataset_path = (Path(__file__).parent.parent / f'data/{config.dataset}.h5').resolve()
+    dataset = PredictorOperatorDataset(abs_dataset_path)
+    train_loader, val_loader, test_loader = get_data_loaders(dataset, config.batch_size)
+
+    # Instantiate model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = FNOProjection(
+    model = get_model_class(config.model.name)(
         n_states=dataset.n_states,
         m_inputs=dataset.m_inputs,
         num_points=dataset.num_points,
+        dt=dataset.dt,
+        delays=dataset.delays,
     ).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.005, weight_decay=0.00001)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.98)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    scheduler = ExponentialLR(optimizer, gamma=config.gamma)
     criterion = nn.MSELoss()
 
     # Logging
     wandb.init(
         project="unicycle",
         config={
-            "epochs": epochs,
-            "batch_size": batch_size,
-            "learning_rate": lr,
+            "epochs": config.epochs,
+            "batch_size": config.batch_size,
+            "learning_rate": config.lr,
             "model_architecture": str(model),
+            "dataset": config.dataset,
         }
     )
     wandb.watch(model, log="all", log_freq=100)
     
-    for epoch in range(epochs):
+    # Model training
+    for epoch in range(config.epochs):
 
         model.train()
         epoch_loss = 0.0
@@ -62,7 +79,7 @@ def train(
             
             # Print training progress
             if (batch_idx+1) % 100 == 0:
-                print(f'Epoch [{epoch+1}/{epochs}], Step [{batch_idx+1}/{len(train_loader)}], Loss: {loss.item():.6f}')
+                print(f'Epoch [{epoch+1}/{config.epochs}], Step [{batch_idx+1}/{len(train_loader)}], Loss: {loss.item():.8f}')
         
         # Update learning rate
         scheduler.step()
@@ -90,23 +107,26 @@ def train(
         wandb.log({
             "epoch_val_loss": avg_val_loss,
         })
-        print(f'Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.6f}')
+        print(f'Epoch [{epoch+1}/{config.epochs}], Validation Loss: {avg_val_loss:.8f}')
 
-    model.save(f"models/const_distinct_delays_{epochs}_epochs.pth")
+    abs_model_path = (Path(__file__).parent.parent / f'models/{config.model.path}.pth').resolve()
+    model.save(abs_model_path)
     wandb.finish()
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--epochs', type=int, default=15,
-                       help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.001,
-                       help='learning rate')
-    parser.add_argument('--batch_size', type=int, default=512,
-                       help='input batch size for training')
-    parser.add_argument('--data_path', type=str, default="data/const_distinct_delays.h5",
-                       help='path to dataset')
+    parser.add_argument('--config', type=str, default='configs/config.toml',
+                       help='relative path to config file from project directory')
     args = parser.parse_args()
 
-    train(args.epochs, args.lr, args.batch_size, args.data_path)
+    abs_cofig_path = (Path(__file__).parent.parent / args.config).resolve()
+    with open(abs_cofig_path, 'rb') as f:
+
+        # Extract config data from .toml file
+        data = tomli.load(f)
+        data['training']['model'] = ModelConfig(**data['training']['model'])
+        config = ModelTrainingConfig(**data['training'])
+
+        train(config)

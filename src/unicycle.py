@@ -1,25 +1,24 @@
 import numpy as np
 
 from system import System
-from models import FNOProjection
+from models import get_model_class
 
 
 class Unicycle(System):
 
-    def __init__(self, init_state, init_inputs, dt, ml_predictor_path=None):
-        super().__init__(init_state, init_inputs, dt)
+    def __init__(self, init_state, init_inputs, config, predictor_model_config=None):
+        super().__init__(init_state, init_inputs, config)
 
         # Initialize ML predictor
-        if ml_predictor_path is not None:
-            self.ml_predictor_model = FNOProjection.load(ml_predictor_path, self.device)
+        if predictor_model_config is not None:
+            name = predictor_model_config.name
+            path = predictor_model_config.path
+            self.ml_predictor_model = get_model_class(name).load(path, self.device)
             self.ml_predictor_model.eval()
 
-        # Initialize predicotr variables
-        self.P = self.exact_predictor()
-        if self.ml_predictor_model is not None:
             self.P_hat = self.ml_predictor()
 
-    def dynamics(self, X, U, dt):
+    def dynamics(self, X, U):
         # X = [x, y, theta]
         # U = [omega, v]
 
@@ -31,9 +30,9 @@ class Unicycle(System):
             isinstance(U, np.ndarray) and (U.shape == (2,))
         ), "U must be a numpy array of 2 elements"
 
-        X[0] += U[1] * np.cos(X[2]) * dt
-        X[1] += U[1] * np.sin(X[2]) * dt
-        X[2] += U[0] * dt
+        X[0] += U[1] * np.cos(X[2]) * self.config.dt
+        X[1] += U[1] * np.sin(X[2]) * self.config.dt
+        X[2] += U[0] * self.config.dt
 
         return X
     
@@ -51,3 +50,7 @@ class Unicycle(System):
 
         # [angular velocity, linear velocity]
         return np.array([U1, U2])
+
+
+if __name__ == '__main__':
+    ...
