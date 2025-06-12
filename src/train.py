@@ -22,13 +22,15 @@ class ModelTrainingConfig:
 
 def train(config: ModelTrainingConfig):
 
+    # Device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # Load dataset
     abs_dataset_path = (Path(__file__).parent.parent / f'data/{config.dataset}.h5').resolve()
-    dataset = PredictorOperatorDataset(abs_dataset_path)
-    train_loader, val_loader, test_loader = get_data_loaders(dataset, config.batch_size)
+    dataset = PredictorOperatorDataset(abs_dataset_path, device)
+    train_loader, val_loader, test_loader = get_data_loaders(dataset, config.batch_size, device)
 
     # Instantiate model
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = get_model_class(config.model.name)(
         n_states=dataset.n_states,
         m_inputs=dataset.m_inputs,

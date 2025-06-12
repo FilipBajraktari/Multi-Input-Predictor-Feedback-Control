@@ -28,12 +28,13 @@ def preprocess_control_inputs(inputs):
     return torch.stack(padded_inputs)
 
 
-def get_data_loaders(dataset: Dataset, batch_size: int):
+def get_data_loaders(dataset: Dataset, batch_size: int, device: torch.device):
 
     # Define split sizes
     train_size = int(0.7 * len(dataset))
     val_size = int(0.15 * len(dataset))
     test_size = len(dataset) - train_size - val_size
+    device_specific_generator = torch.Generator(device=device)
 
     # Split the dataset
     train_dataset, val_dataset, test_dataset = random_split(
@@ -42,13 +43,22 @@ def get_data_loaders(dataset: Dataset, batch_size: int):
 
     # Create DataLoaders
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        generator=device_specific_generator,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        generator=device_specific_generator,
     )
     test_loader = DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False
+        test_dataset,
+        batch_size=batch_size, 
+        shuffle=False,
+        generator=device_specific_generator,
     )
 
     return train_loader, val_loader, test_loader
@@ -56,8 +66,9 @@ def get_data_loaders(dataset: Dataset, batch_size: int):
 
 class PredictorOperatorDataset(Dataset):
 
-    def __init__(self, file_path):
+    def __init__(self, file_path, device: torch.device):
         self.file_path = file_path
+        self.device = device
         with h5py.File(file_path, 'r') as f:
             self.keys_list = list(f.keys())
             self.n_states = f.attrs['n_states']
@@ -73,11 +84,12 @@ class PredictorOperatorDataset(Dataset):
         with h5py.File(self.file_path, 'r') as f:
             sample_key = self.keys_list[idx]
             sample = f[sample_key]
-            X = torch.tensor(sample['X'][:])
+            X = torch.tensor(sample['X'][:], device=self.device)
             U = preprocess_control_inputs([
-                torch.tensor(sample[f'U{i}'][:]) for i in range(self.m_inputs)
+                torch.tensor(sample[f'U{i}'][:], device=self.device)
+                for i in range(self.m_inputs)
             ])
-            P = torch.tensor(sample['P'][:])
+            P = torch.tensor(sample['P'][:], device=self.device)
 
         return X, U, P
 
