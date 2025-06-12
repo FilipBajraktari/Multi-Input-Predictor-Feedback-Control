@@ -16,7 +16,7 @@ files in the dataset and models folders (See below for structure).
 
    >The repository directory should look like this:
   ```
-  NeuralOpertorPredictorFeedback/
+  Multi-Input-Predictor-Feedback-Control/
   ├── config/
   ├── data/ # Place the cloned datasets here
   ├── media/
@@ -34,7 +34,7 @@ If you have any issues with any of the notebooks or models in this repo, feel fr
 ### Citation 
 If you found this work useful or interesting for your own research, we would appreciate if you could cite our work:
 ```
-@misc{bhan2025neuraloperatorspredictorfeedback,
+@misc{bajraktari2025multiinputpredictorfeedbackcontrol,
       title={Delay Compensation in Multi-Input Nonlinear Systems via Neural Operator Approximate Predictors}, 
       author={Filip Bajraktari and Luke Bhan and Miroslav Krstic and Yuanyuan Shi},
       year={2025},
