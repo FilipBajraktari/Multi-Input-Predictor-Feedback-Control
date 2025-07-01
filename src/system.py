@@ -12,11 +12,16 @@ from models import preprocess_control_inputs
 class SimulationConfig:
     T: float
     dt: float
+    dx: float
     delays: List[float]
 
     @property
     def t(self) -> np.ndarray:
         return np.arange(0, self.T + self.dt, self.dt)
+    
+    @property
+    def x(self) -> np.ndarray:
+        return np.arange(0, 1 + self.dx, self.dx)
     
     @property
     def NDs(self) -> List[int]:
@@ -25,6 +30,10 @@ class SimulationConfig:
     @property
     def N(self) -> int:
         return len(self.t)
+    
+    @property
+    def NX(self) -> int:
+        return len(self.x)
 
 
 class System(ABC):
@@ -148,6 +157,84 @@ class System(ABC):
         return self.X, self.P, self.P_hat
     
 
+class DimensionlessSystem(ABC):
+    
+    def __init__(self, init_state, config: SimulationConfig):
+
+        assert all(config.delays[i-1] <= config.delays[i]
+            for i in range(1, len(config.delays))), \
+            "It is assumed that the order D1 <= D2 <= ... <= Dm holds!"
+
+        # Simulation config
+        self.config: SimulationConfig = config
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Initialize state
+        assert len(init_state) == 3
+        self.n = len(init_state)
+        self.X = np.copy(init_state)
+
+        # Initial input history
+        # TODO: For now it is hardcoded and assumed that init_inputs are zero
+        self.m = 2
+        self.control_pdes = np.zeros((self.m, self.m * config.NX))
+
+        # TEST
+        self.control_pdes[0] = 1
+
+    @staticmethod
+    def dynamics(X, U):
+        f1 = U[1] * np.cos(X[2])
+        f2 = U[1] * np.sin(X[2])
+        f3 = U[0]
+        return np.array([f1, f2, f3])
+    
+    @staticmethod
+    def control(X, t):
+        P = X[0] * np.cos(X[2]) + X[1] * np.sin(X[2])
+        Q = X[0] * np.sin(X[2]) - X[1] * np.cos(X[2])
+        U1 = -5 * P**2 * np.cos(3*t) - P * Q * (1 + 25 * np.cos(3*t)**2) - X[2]
+        U2 = -P + 5 * Q * (np.sin(3*t) - np.cos(3*t)) + Q * U1
+        return np.array([U1, U2])
+
+    def predict(self):
+        P = np.zeros((self.m, self.config.NX, self.n))
+        for i in range(self.m):
+
+            # Initialization
+            P[i, 0] = P[i-1, -1] if i>0 else self.X
+
+            # Calculate
+            delays = self.config.delays
+            varphi = (delays[i] - delays[i-1]) if i > 0 else delays[0]
+            integral_tmp = np.zeros((self.config.NX, self.n))
+            for j in range(1, self.config.NX):
+                integral_tmp[j] = DimensionlessSystem.dynamics(P[i, j-1], self.control_pdes[:, i*self.config.NX + j-1])
+                P[i, j] = P[i, 0] + varphi*np.array([np.trapezoid(integral_tmp[0:j+1, 0], dx=self.config.dx),
+                                                    np.trapezoid(integral_tmp[0:j+1, 1], dx=self.config.dx),
+                                                    np.trapezoid(integral_tmp[0:j+1, 2], dx=self.config.dx)])
+                
+        return P[:, -1]
+
+    def step(self, U):
+
+        # Update system state
+        self.X = self.dynamics(self.X, self.control_pdes[:, 0])
+
+        # Update control history
+        dt = self.config.dt
+        dx = self.config.dx
+        delays = self.config.delays
+        NX = self.config.NX
+        for i in range(self.m):
+            for j in range(i-1, -1, -1):
+                varphi = (delays[i] - delays[i-1]) if i > 0 else delays[0]
+                self.control_pdes[i, 0:NX-1] += dt/(varphi*dx) * (self.control_pdes[i, 1:NX] - self.control_pdes[i, 0:NX-1])
+                self.control_pdes[i][:-1] = self.control_pdes[i+1][1:] if i < j-1 else U[i]
+
+        return self.X, self.P, self.P_hat
+
+
 def simulate_system(system: System):
     t = system.config.t
     NDs = system.config.NDs
@@ -170,4 +257,7 @@ def simulate_system(system: System):
 
 
 if __name__ == '__main__':
-    ...
+    init_state = np.ones(3, dtype=np.float32)
+    config = SimulationConfig(T=10,dt=0.001,dx=0.01,delays=[0.25,0.60])
+    uni = DimensionlessSystem(init_state, config)
+    print(uni.predict())
