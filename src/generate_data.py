@@ -66,7 +66,10 @@ def generate_data(simulation_cfg: SimulationConfig, dataset_cfg: DatasetGenerati
                     end = (i+1) * NX
                     group.create_dataset('U', data=control_pdes[idx, :, start:end])     # Control PDEs
                     group.create_dataset('P', data=P[idx, i])                           # Predictors
-                    varphi = (delays[i] - delays[i-1]) if i > 0 else delays[0]
+                    varphi = np.array(
+                        [(delays[i] - delays[i-1]) if i > 0 else delays[0]],
+                        dtype=np.float32,
+                    )
                     group.create_dataset('varphi', data=varphi)                         # varphi
                 sample_cnt += 1
 
