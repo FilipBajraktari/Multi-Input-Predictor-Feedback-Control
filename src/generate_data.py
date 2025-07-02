@@ -7,8 +7,7 @@ import numpy as np
 import tomli
 from tqdm import tqdm
 
-from system import SimulationConfig, simulate_system
-from unicycle import Unicycle
+from unicycle import SimulationConfig, Unicycle, simulate_system
 
 
 @dataclass
@@ -29,55 +28,57 @@ def sample_init_state():
 
 def generate_data(simulation_cfg: SimulationConfig, dataset_cfg: DatasetGenerationConfig):
 
-    # Extract config data
+    # Extract simulation config data
     dt = simulation_cfg.dt
+    dx = simulation_cfg.dx
     delays = simulation_cfg.delays
-    NDs = simulation_cfg.NDs
     N = simulation_cfg.N
+    NX = simulation_cfg.NX
+
+    # Extract dataset generation config data
     num_sim = dataset_cfg.num_sim
     sample_ratio = dataset_cfg.sample_ratio
 
     # Generate data
-    abs_dataset_path = (Path(__file__).parent.parent / f'data/{dataset_cfg.filename}.h5').resolve()
-    with h5py.File(abs_dataset_path, 'w') as f:
+    abs_dataset_path_P1 = (Path(__file__).parent.parent / f'data/{dataset_cfg.filename}_P1.h5').resolve()
+    abs_dataset_path_P2 = (Path(__file__).parent.parent / f'data/{dataset_cfg.filename}_P2.h5').resolve()
+    with (
+        h5py.File(abs_dataset_path_P1, 'w') as f1,
+        h5py.File(abs_dataset_path_P2, 'w') as f2
+    ):
+        files = [f1, f2]
 
         sample_cnt = 0
         for _ in tqdm(range(num_sim)):
 
             # Execute simulation
             init_state = sample_init_state()
-            init_inputs = [np.zeros(NDi, dtype=np.float32) for NDi in NDs]
-            unicycle = Unicycle(init_state, init_inputs, simulation_cfg)
-            states, controls, P, P_hat = simulate_system(unicycle)
+            unicycle = Unicycle(init_state, simulation_cfg)
+            states, controls, P, P_hat, control_pdes = simulate_system(unicycle)
 
             # Extract data
             indexes = np.random.randint(0, N, int(sample_ratio * N))
-            for i in indexes:
-                group = f.create_group(f'sample_{sample_cnt:06d}')
+            for idx in indexes:
+                for i, f in enumerate(files):
+                    group = f.create_group(f'sample_{sample_cnt:06d}')
+                    group.create_dataset('X', data=P[idx, i, 0])                        # States
+                    start = i * NX
+                    end = (i+1) * NX
+                    group.create_dataset('U', data=control_pdes[idx, :, start:end])     # Control PDEs
+                    group.create_dataset('P', data=P[idx, i])                           # Predictors
+                    varphi = (delays[i] - delays[i-1]) if i > 0 else delays[0]
+                    group.create_dataset('varphi', data=varphi)                         # varphi
                 sample_cnt += 1
 
-                group.create_dataset('X', data=states[i])
-                for k in range(len(delays)):
-                    start_idx = i - NDs[k]
-                    if start_idx < 0:
-                        pad_length = -start_idx
-                        available_data = controls[:i, k]
-                        data = np.concatenate([
-                            np.zeros(pad_length, dtype=available_data.dtype),
-                            available_data,
-                        ])
-                    else:
-                        data = controls[start_idx:i, k]
-                    group.create_dataset(f'U{k}', data=data)
-                group.create_dataset('P', data=P[i])
-
         # Add global attributes
-        f.attrs['n_states'] = len(sample_init_state())
-        f.attrs['m_inputs'] = len(delays)
-        f.attrs['num_points'] = NDs[-1]
-        f.attrs['dt'] = dt
-        f.attrs['delays'] = delays
-        f.attrs['creation_date'] = datetime.now().strftime('%Y_%m_%d_%H:%M:%S')
+        for f in files:
+            f.attrs['n_states'] = len(sample_init_state())
+            f.attrs['m_inputs'] = len(delays)
+            f.attrs['num_points'] = NX
+            f.attrs['dt'] = dt
+            f.attrs['dx'] = dx
+            f.attrs['delays'] = delays
+            f.attrs['creation_date'] = datetime.now().strftime('%Y_%m_%d_%H:%M:%S')
 
 if __name__ == "__main__":
     import argparse

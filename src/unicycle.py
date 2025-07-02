@@ -148,7 +148,7 @@ class Unicycle:
         if self.predict_ml and self.ml_predictor_model is not None:
             self.P_hat = None
 
-        return self.X, self.P, self.P_hat
+        return self.X, self.P, self.P_hat, self.control_pdes
 
 
 def simulate_system(uni: Unicycle):
@@ -159,16 +159,17 @@ def simulate_system(uni: Unicycle):
     controls = np.zeros((N, 2), dtype=np.float32)
     P = np.zeros((N,) + uni.P.shape, dtype=np.float32)
     P_hat = np.zeros((N,) + uni.P.shape, dtype=np.float32)
+    control_pdes = np.zeros((N,) + uni.control_pdes.shape, dtype=np.float32)
 
     states[0] = uni.X
     P[0] = uni.P
     P_hat[0] = uni.P_hat
     for i in tqdm(range(1, N)):
         controls[i-1] = uni.controller(t[i-1])
-        states[i], P[i], P_hat[i] = uni.step(controls[i-1])
+        states[i], P[i], P_hat[i], control_pdes[i] = uni.step(controls[i-1])
     controls[N-1] = uni.controller(t[N-1])
 
-    return states, controls, P, P_hat
+    return states, controls, P, P_hat, control_pdes
 
 
 if __name__ == '__main__':

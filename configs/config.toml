@@ -5,9 +5,9 @@ dx=0.01
 delays=[0.25, 0.60]
 
 [dataset]
-filename="UnicycleConstDistinctDelays_25_60_dt_01"
-num_sim=500
-sample_ratio=0.4
+filename="Unicycle_delays_25_60_dx_01"
+num_sim=1
+sample_ratio=0.2
 
 [training]
 epochs=100
@@ -15,8 +15,8 @@ lr=0.001
 weight_decay=0.0001
 gamma=0.93
 batch_size=128
-dataset="UnicycleConstDistinctDelays_25_60_dt_01"
+dataset=""
 
 [training.model]
 name="FNO"
-path="UnicycleConstDistinctDelays_FNO_25_60_dt_01"
+path=""

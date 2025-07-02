@@ -15,8 +15,7 @@ wheels/
 # wandb
 wandb/
 
-# Datasets
+# Datasets / ML models
 data/
-
-# ML models
 models/
+*.zip
