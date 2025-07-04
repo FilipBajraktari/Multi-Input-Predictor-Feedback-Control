@@ -3,7 +3,8 @@ from typing import List
 
 import numpy as np
 import torch
-from tqdm import tqdm
+
+from models import ModelConfig, get_model_class
 
 
 @dataclass
@@ -30,16 +31,22 @@ class SimulationConfig:
         return len(self.x)
 
 
+@dataclass
+class InferenceConfig:
+    name: str
+    P1: str
+    P2: str
+
 class Unicycle:
     
-    def __init__(self, init_state, config: SimulationConfig):
+    def __init__(self, init_state, simulation_config: SimulationConfig, inference_config: InferenceConfig = None):
 
-        assert all(config.delays[i-1] < config.delays[i]
-            for i in range(1, len(config.delays))), \
+        assert all(simulation_config.delays[i-1] < simulation_config.delays[i]
+            for i in range(1, len(simulation_config.delays))), \
             "It is assumed that the order D1 < D2 < ... < Dm holds!"
 
         # Simulation config
-        self.config: SimulationConfig = config
+        self.config: SimulationConfig = simulation_config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Initialize state
@@ -50,7 +57,7 @@ class Unicycle:
         # Initial input history
         # TODO: For now it is hardcoded and assumed that init_inputs are zero
         self.m = 2
-        self.control_pdes = np.zeros((self.m, self.m * config.NX), dtype=np.float32)
+        self.control_pdes = np.zeros((self.m, self.m * simulation_config.NX), dtype=np.float32)
         self.delay_lookup = np.zeros((self.m, self.m))
         for i in range(self.m):
             delay_amount = self.config.delays[i]
@@ -62,7 +69,22 @@ class Unicycle:
         # Exact/ML predictors
         self.P = self.predict()
         self.P_hat = None
-        self.ml_predictor_model = None
+        self.ml_predictors = None
+        if inference_config is not None:
+            name = inference_config.name
+
+            # P1
+            P1 = inference_config.P1
+            self.P1 = get_model_class(name).load(P1, self.device)
+            self.P1.eval()
+
+            # P2
+            P2 = inference_config.P2
+            self.P2 = get_model_class(name).load(P2, self.device)
+            self.P2.eval()
+
+            self.ml_predictors = [self.P1, self.P2]
+            self.P_hat = self.ml_predict()
 
         # These variables are used for perf estimates to manually swith them on/off
         self.predict_exact = True
@@ -81,8 +103,11 @@ class Unicycle:
         self.predict_ml = True
 
     def get_model_params(self):
-        assert self.ml_predictor_model is not None
-        return sum(p.numel() for p in self.ml_predictor_model.parameters())
+        assert self.ml_predictors is not None
+        return [
+            sum(p.numel() for p in ml_predictor.parameters())
+            for ml_predictor in self.ml_predictors
+        ]
 
     @staticmethod
     def dynamics(X, U):
@@ -100,7 +125,7 @@ class Unicycle:
         return np.array([U1, U2])
     
     def controller(self, t):
-        P = self.P if self.ml_predictor_model is None else self.P_hat
+        P = self.P_hat if self.ml_predictors is not None else self.P
         return np.array([
             self.control(P[i, -1], t + self.config.delays[i])[i]
             for i in range(self.m)
@@ -124,6 +149,28 @@ class Unicycle:
                                                     np.trapezoid(integral_tmp[0:j+1, 2], dx=self.config.dx)])
         
         return self.P
+    
+    def ml_predict(self):
+        assert self.ml_predictors is not None
+
+        NX = self.config.NX
+        delays = self.config.delays
+
+        self.P_hat = np.zeros((self.m, self.config.NX, self.n), dtype=np.float32)
+        for i, ml_predictor in enumerate(self.ml_predictors):
+            Q = self.P_hat[i-1, -1] if i > 0 else self.X
+            X = torch.tensor(Q, device=self.device).unsqueeze(0)
+            start = i * NX
+            end = (i+1) * NX
+            U = torch.tensor(self.control_pdes[:, start:end], device=self.device).unsqueeze(0)
+            varphi = torch.tensor(
+                [(delays[i] - delays[i-1]) if i > 0 else delays[0]],
+                device=self.device,
+            ).unsqueeze(0)
+
+            self.P_hat[i] = ml_predictor(X, U, varphi).squeeze(0).cpu().detach().numpy()
+
+        return self.P_hat
 
     def step(self, U):
 
@@ -145,8 +192,8 @@ class Unicycle:
         # Update system predictors
         if self.predict_exact:
             self.P = self.predict()
-        if self.predict_ml and self.ml_predictor_model is not None:
-            self.P_hat = None
+        if self.predict_ml and self.ml_predictors is not None:
+            self.P_hat = self.ml_predict()
 
         return self.X, self.P, self.P_hat, self.control_pdes
 
@@ -164,7 +211,7 @@ def simulate_system(uni: Unicycle):
     states[0] = uni.X
     P[0] = uni.P
     P_hat[0] = uni.P_hat
-    for i in tqdm(range(1, N)):
+    for i in range(1, N):
         controls[i-1] = uni.controller(t[i-1])
         states[i], P[i], P_hat[i], control_pdes[i] = uni.step(controls[i-1])
     controls[N-1] = uni.controller(t[N-1])

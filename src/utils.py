@@ -138,17 +138,18 @@ def plot_trajectory(
     ax3.set_ylabel(r"$\theta(t)$", labelpad=2)
     # ax3.set_yticks([0, 0.25, 0.5, 0.75, 1])
     # ax3.set_xticks([0, 2.5, 5, 7.5, 10])
-    
 
-    ax4.plot(t, predictors[:, 0, -1], label="Const delay", **style1)
-    ax4.plot(t, predictors_ml[:, 0, -1], label="Const delay ML", **style2)
+    # (N, m, NX, n)
+    ax4.plot(t, predictors[:, 1, -1, 0], label="Const delay", **style1)
+    ax4.plot(t, predictors_ml[:, 1, -1, 0], label="Const delay ML", **style2)
     ax4.set_ylabel(r"$P_{2_{X_1}}(t) \approx x(t+D(t))$")
     ax4.set_xlabel("t")
     # ax4.set_xticks([0, 2.5, 5, 7.5, 10])
     # ax4.set_yticks([1, 0.5, 0, -0.5, -1])
 
-    ax5.plot(t, predictors[:, 1, -1], label="Const delay", **style1)
-    ax5.plot(t, predictors_ml[:, 1, -1], label="Const delay ML", **style2)
+    # (N, m, NX, n)
+    ax5.plot(t, predictors[:, 1, -1, 1], label="Const delay", **style1)
+    ax5.plot(t, predictors_ml[:, 1, -1, 1], label="Const delay ML", **style2)
     ax5.set_ylabel(r"$P_{2_{X_2}}(t) \approx y(t+D(t))$", labelpad=2)
     ax5.set_xlabel("t")
     # ax5.set_xticks([0, 2.5, 5, 7.5, 10])
@@ -159,13 +160,13 @@ def plot_trajectory(
         axins2 = inset_axes(ax5, width="30%", height="30%", bbox_to_anchor=(-0.2, -0.2, 1,1),  # (x0, y0, width, height)
                        bbox_transform=ax5.transAxes,
                        borderpad=0)  # Location of inset
-        axins2.plot(t, predictors[:, 1, -1], label="Const delay", **style1)
-        axins2.plot(t, predictors_ml[:, 1, -1], label="Const delay ML", **style2)
+        axins2.plot(t, predictors[:, 1, -1, 1], label="Const delay", **style1)
+        axins2.plot(t, predictors_ml[:, 1, -1, 1], label="Const delay ML", **style2)
         
 
         # Limit the region shown in inset
         x1, x2 = 5.5, 6
-        y1, y2 = get_y_range_zoom(t, x1, x2, predictors[:, 1, -1])
+        y1, y2 = get_y_range_zoom(t, x1, x2, predictors[:, 1, -1, 1])
         axins2.set_xlim(x1, x2)
         axins2.set_ylim(y1, y2)
 
@@ -174,8 +175,9 @@ def plot_trajectory(
         axins2.set_yticks([])
         mark_inset(ax5, axins2, loc1=2, loc2=4, fc="none", ec="0.5")
     
-    ax6.plot(t, predictors[:, 2, -1], label="Const delay", **style1)
-    ax6.plot(t, predictors_ml[:, 2, -1], label="Const delay ML", **style2)
+    # (N, m, NX, n)
+    ax6.plot(t, predictors[:, 1, -1, 2], label="Const delay", **style1)
+    ax6.plot(t, predictors_ml[:, 1, -1, 2], label="Const delay ML", **style2)
     ax6.set_xlabel("t")
     ax6.set_ylabel(r"$P_{2_{X_3}}(t) \approx \theta(t+D(t))$", labelpad=2)
     ax6.set_yticks([0, 0.25, 0.5, 0.75, 1])

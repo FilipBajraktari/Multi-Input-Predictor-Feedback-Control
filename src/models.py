@@ -7,13 +7,6 @@ from neuralop.models import FNO
 from torch.utils.data import DataLoader, Dataset, random_split
 
 
-# # Deepxde sets defualt device to 'cuda' if it is available and that breaks
-# # Dataloader becuase the generator it uses must be on the same device as
-# # data. GPU random generator is way slower than CPU's. Thus, we override
-# # torch default device back to CPU
-# torch.set_default_device('cpu')
-
-
 def get_data_loaders(dataset: Dataset, batch_size: int, device: torch.device):
 
     # Define split sizes
@@ -116,7 +109,7 @@ class NeuralPredictor(nn.Module):
             'm_inputs': self.m_inputs,
             'num_points': self.num_points,
             'dt': self.dt,
-            'dt': self.dx,
+            'dx': self.dx,
             'delays': self.delays,
         }, path)
 
