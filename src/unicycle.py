@@ -4,7 +4,7 @@ from typing import List
 import numpy as np
 import torch
 
-from models import ModelConfig, get_model_class
+from models import get_model_class
 
 
 @dataclass

@@ -15,13 +15,13 @@ lr=0.001
 weight_decay=0.0001
 gamma=0.93
 batch_size=32
-dataset="Unicycle_delays_25_60_dx_01_P1"
+dataset="Unicycle_delays_25_60_dx_01_P2"
 
 [training.model]
-name="FNO"
-path="Unicycle_delays_25_60_dx_01_P1"
+name="DeepONet"
+path="Unicycle_delays_25_60_dx_01_DeepONet_P2"
 
 [inference]
-name="FNO"
-P1="Unicycle_delays_25_60_dx_01_P1"
-P2="Unicycle_delays_25_60_dx_01_P2"
+name="DeepONet"
+P1="Unicycle_delays_25_60_dx_01_DeepONet_P1"
+P2="Unicycle_delays_25_60_dx_01_DeepONet_P2"
