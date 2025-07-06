@@ -1,21 +1,27 @@
 [simulation]
 T=10
-dt=0.01
+dt=0.001
+dx=0.01
 delays=[0.25, 0.60]
 
 [dataset]
-filename="UnicycleConstDistinctDelays_25_60_dt_01"
-num_sim=500
-sample_ratio=0.4
+filename="Unicycle_delays_25_60_dx_01"
+num_sim=100
+sample_ratio=0.2
 
 [training]
-epochs=100
+epochs=30
 lr=0.001
 weight_decay=0.0001
 gamma=0.93
-batch_size=128
-dataset="UnicycleConstDistinctDelays_25_60_dt_01"
+batch_size=32
+dataset="Unicycle_delays_25_60_dx_01_P2"
 
 [training.model]
-name="FNO"
-path="UnicycleConstDistinctDelays_FNO_25_60_dt_01"
+name="DeepONet"
+path="Unicycle_delays_25_60_dx_01_DeepONet_P2"
+
+[inference]
+name="DeepONet"
+P1="Unicycle_delays_25_60_dx_01_DeepONet_P1"
+P2="Unicycle_delays_25_60_dx_01_DeepONet_P2"

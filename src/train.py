@@ -36,6 +36,7 @@ def train(config: ModelTrainingConfig):
         m_inputs=dataset.m_inputs,
         num_points=dataset.num_points,
         dt=dataset.dt,
+        dx=dataset.dx,
         delays=dataset.delays,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
@@ -60,15 +61,16 @@ def train(config: ModelTrainingConfig):
 
         model.train()
         epoch_loss = 0.0
-        for batch_idx, (state, controls, prediction) in enumerate(train_loader):
+        for batch_idx, (state, control, prediction, varphi) in enumerate(train_loader):
 
             # Move data to device
             state = state.to(device)
-            controls = controls.to(device)
+            control = control.to(device)
             prediction = prediction.to(device)
+            varphi = varphi.to(device)
 
             # Forward pass
-            outputs = model(state, controls)
+            outputs = model(state, control, varphi)
             loss = criterion(outputs, prediction)
             
             # Backward pass and optimize
@@ -96,11 +98,12 @@ def train(config: ModelTrainingConfig):
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
-            for state, controls, prediction in val_loader:
+            for state, control, prediction, varphi in val_loader:
                 state = state.to(device)
-                controls = controls.to(device)
+                control = control.to(device)
                 prediction = prediction.to(device)
-                outputs = model(state, controls)
+                varphi = varphi.to(device)
+                outputs = model(state, control, varphi)
                 val_loss += criterion(outputs, prediction).item()
         
         avg_val_loss = val_loss / len(val_loader)

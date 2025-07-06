@@ -1,4 +1,7 @@
 # Delay Compensation in Multi-Input Nonlinear Systems via Neural Operator Approximate Predictors
+<div align="center">
+ <a href="#"><img alt="Main result from the paper" src="media/Multi-Input-Predictor-Feedback.png" width="100%"/></a>
+</div>
 
 ## Introduction
 
