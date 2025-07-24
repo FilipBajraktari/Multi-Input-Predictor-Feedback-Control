@@ -1,8 +1,10 @@
 from pathlib import Path
-import matplotlib.pyplot as plt
+
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+
 
 def set_size(width, fraction=1, subplots=(1, 1), height_add=0):
     """Set figure dimensions to avoid scaling in LaTeX.
@@ -60,6 +62,7 @@ linestyle_tuple = [
     ('densely dashdotdotted', (0, (3, 1, 1, 1, 1, 1))),     # 12
 ]
 
+
 def get_y_range_zoom(t, x1, x2, y, t_offset=0):
     dt = t[1] - t[0]
 
@@ -70,6 +73,7 @@ def get_y_range_zoom(t, x1, x2, y, t_offset=0):
     maximum = np.max(y[nx1:nx2+1])
     
     return 0.9 * minimum, 1.1 * maximum
+
 
 def plot_trajectory(
     t,
@@ -213,5 +217,111 @@ def plot_trajectory(
     plt.show()
 
 
+def plot_trajectory_without_predictors(
+    t,
+    u_delay, u_delay_deeponet, u_delay_fno,
+    control_delay, control_delay_deeponet, control_delay_fno,
+    savefig=None,
+    axis=None,
+):
+    # Adjust figure size to be taller to accommodate titles
+    fig = plt.figure(figsize=set_size(469.75502, 1, (2, 2), height_add=1.0))
+    gs = gridspec.GridSpec(2, 6, height_ratios=[1, 1], hspace=0.6, wspace=1)
+    
+    # First row (system states)
+    ax1 = fig.add_subplot(gs[0, 0:2])
+    ax2 = fig.add_subplot(gs[0, 2:4])
+    ax3 = fig.add_subplot(gs[0, 4:6])
+    
+    # Second row (control inputs)
+    ax7 = fig.add_subplot(gs[1, 0:3])
+    ax8 = fig.add_subplot(gs[1, 3:6])
+    
+    style1 = {'color': 'tab:red', 'linestyle': linestyle_tuple[2][1], 'linewidth': 2}
+    style2 = {'color': 'tab:blue', 'linestyle': linestyle_tuple[5][1], 'linewidth': 2, 'alpha': 0.8}
+    style3 = {'color': 'tab:brown', 'linestyle': linestyle_tuple[8][1], 'linewidth': 2, 'alpha': 0.6}
+
+    # Plot system states
+    ax1.plot(t, u_delay[:, 0], **style1)
+    ax1.plot(t, u_delay_deeponet[:, 0], **style2)
+    ax1.plot(t, u_delay_fno[:, 0], **style3)
+    ax1.set_xlabel("t", labelpad=1)
+    ax1.set_ylabel(r"$x(t)$", labelpad=2)
+
+    ax2.plot(t, u_delay[:, 1], **style1)
+    ax2.plot(t, u_delay_deeponet[:, 1], **style2)
+    ax2.plot(t, u_delay_fno[:, 1], **style3)
+    ax2.set_xlabel("t", labelpad=1)
+    ax2.set_ylabel(r"$y(t)$", labelpad=2)
+    
+    if axis: 
+        axins = inset_axes(ax2, width="30%", height="30%", bbox_to_anchor=(-0.2, -0.2, 1,1),
+                       bbox_transform=ax2.transAxes, borderpad=0)
+        axins.plot(t, u_delay[:, 1], **style1)
+        axins.plot(t, u_delay_deeponet[:, 1], **style2)
+        axins.plot(t, u_delay_fno[:, 1], **style3)
+        
+        x1, x2 = 5.5, 6
+        y1, y2 = get_y_range_zoom(t, x1, x2, u_delay[:, 1])
+        axins.set_xlim(x1, x2)
+        axins.set_ylim(y1, y2)
+        axins.set_xticks([])
+        axins.set_yticks([])
+        mark_inset(ax2, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+
+    ax3.plot(t, u_delay[:, 2], **style1)
+    ax3.plot(t, u_delay_deeponet[:, 2], **style2)
+    ax3.plot(t, u_delay_fno[:, 2], **style3)
+    ax3.set_xlabel("t", labelpad=1)
+    ax3.set_ylabel(r"$\theta(t)$", labelpad=2)
+
+    # Plot control inputs
+    ax7.plot(t, control_delay[:, 0], **style1)
+    ax7.plot(t, control_delay_deeponet[:, 0], **style2)
+    ax7.plot(t, control_delay_fno[:, 0], **style3)
+    ax7.set_xlabel("t", labelpad=1)
+    ax7.set_ylabel(r"$\nu_1(t)$", labelpad=2)
+    ax7.set_yticks([-15, -10, -5, 0, 5])
+
+    l1, = ax8.plot(t, control_delay[:, 1], label="Fixed point iteration", **style1)
+    l2, = ax8.plot(t, control_delay_deeponet[:, 1], label="DeepONet", **style2)
+    l3, = ax8.plot(t, control_delay_fno[:, 1], label="FNO", **style3)
+    ax8.set_xlabel("t", labelpad=1)
+    ax8.set_ylabel(r"$\nu_2(t)$", labelpad=2)
+    ax8.set_yticks([-6, -4, -2, 0, 2])
+
+    # Add section titles with more vertical spacing
+    fig.text(0.5, 0.92, "System states", va='center', ha='center', fontsize=16)
+    fig.text(0.5, 0.50, "Control Inputs", va='center', ha='center', fontsize=16)
+
+    # Add legend with more bottom padding
+    fig.legend(handles=[l1, l2, l3], loc='lower center', ncol=3, fontsize=10,
+              frameon=True, fancybox=True, shadow=False,
+              bbox_to_anchor=(0.5, 0.04))
+    
+    # Adjust subplot parameters to prevent overlap
+    plt.subplots_adjust(
+        hspace=0.6,
+        left=0.1,
+        right=0.98,
+        top=0.88,
+        bottom=0.18,
+        wspace=1
+    )
+    
+    if savefig is not None:
+        abs_fig_path = (Path(__file__).parent.parent / f'media/{savefig}.png').resolve()
+        plt.savefig(abs_fig_path, dpi=300, bbox_inches='tight')
+    plt.show()
+
+
 if __name__ == '__main__':
-    ...
+    T, dt = 1, 0.01
+    t = np.arange(0, T + dt, dt)
+    n = len(t)
+    plot_trajectory_without_predictors(
+        t,
+        np.zeros((n,3)),np.zeros((n,3)),np.zeros((n,3)),
+        np.zeros((n,2)),np.zeros((n,2)),np.zeros((n,2)),
+        savefig='single_trajectory_test'
+    )
