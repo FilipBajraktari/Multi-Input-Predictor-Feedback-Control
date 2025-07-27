@@ -237,9 +237,9 @@ def plot_trajectory_without_predictors(
     ax7 = fig.add_subplot(gs[1, 0:3])
     ax8 = fig.add_subplot(gs[1, 3:6])
     
-    style1 = {'color': 'tab:red', 'linestyle': linestyle_tuple[2][1], 'linewidth': 2}
-    style2 = {'color': 'tab:blue', 'linestyle': linestyle_tuple[5][1], 'linewidth': 2, 'alpha': 0.8}
-    style3 = {'color': 'tab:brown', 'linestyle': linestyle_tuple[8][1], 'linewidth': 2, 'alpha': 0.6}
+    style1 = {'color': (0, 0, 0), 'linestyle': linestyle_tuple[2][1], 'linewidth': 2}
+    style2 = {'color': 'tab:red', 'linestyle': linestyle_tuple[5][1], 'linewidth': 2}
+    style3 = {'color': 'tab:blue', 'linestyle': linestyle_tuple[8][1], 'linewidth': 2}
 
     # Plot system states
     ax1.plot(t, u_delay[:, 0], **style1)
