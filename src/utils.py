@@ -315,13 +315,108 @@ def plot_trajectory_without_predictors(
     plt.show()
 
 
+def plot_system_states_only(
+    t,
+    u_delay, u_delay_deeponet, u_delay_fno,
+    savefig=None,
+    axis=None,
+):
+    # Adjust figure size to be taller to accommodate titles
+    w, h = set_size(469.75502, height_add=0.5)
+    fig = plt.figure(figsize=(w,0.45*h))
+    gs = gridspec.GridSpec(1, 3, height_ratios=[1], hspace=0.6)
+    
+    # System states plots
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax3 = fig.add_subplot(gs[0, 2])
+    
+    style1 = {'color': (0, 0, 0), 'linestyle': linestyle_tuple[2][1], 'linewidth': 2}
+    style2 = {'color': 'tab:red', 'linestyle': linestyle_tuple[5][1], 'linewidth': 2}
+    style3 = {'color': 'tab:blue', 'linestyle': linestyle_tuple[8][1], 'linewidth': 2}
+
+    # Plot system states
+    ax1.plot(t, u_delay[:, 0], **style1)
+    ax1.plot(t, u_delay_deeponet[:, 0], **style2)
+    ax1.plot(t, u_delay_fno[:, 0], **style3)
+    ax1.set_xlabel("t", labelpad=1)
+    ax1.set_ylabel(r"$x(t)$", labelpad=2)
+
+    ax2.plot(t, u_delay[:, 1], **style1)
+    ax2.plot(t, u_delay_deeponet[:, 1], **style2)
+    ax2.plot(t, u_delay_fno[:, 1], **style3)
+    ax2.set_xlabel("t", labelpad=1)
+    ax2.set_ylabel(r"$y(t)$", labelpad=2)
+    
+    if axis: 
+        axins = inset_axes(ax2, width="30%", height="30%", bbox_to_anchor=(-0.2, -0.2, 1,1),
+                       bbox_transform=ax2.transAxes, borderpad=0)
+        axins.plot(t, u_delay[:, 1], **style1)
+        axins.plot(t, u_delay_deeponet[:, 1], **style2)
+        axins.plot(t, u_delay_fno[:, 1], **style3)
+        
+        x1, x2 = 5.5, 6
+        y1, y2 = get_y_range_zoom(t, x1, x2, u_delay[:, 1])
+        axins.set_xlim(x1, x2)
+        axins.set_ylim(y1, y2)
+        axins.set_xticks([])
+        axins.set_yticks([])
+        mark_inset(ax2, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+
+    ax3.plot(t, u_delay[:, 2], **style1)
+    ax3.plot(t, u_delay_deeponet[:, 2], **style2)
+    ax3.plot(t, u_delay_fno[:, 2], **style3)
+    ax3.set_xlabel("t", labelpad=1)
+    ax3.set_ylabel(r"$\theta(t)$", labelpad=2)
+
+    # Add section title
+    fig.text(0.5, 0.92, "System states", va='center', ha='center', fontsize=14)
+
+    # Add legend with more bottom padding
+    l1, = ax3.plot([], [], label="Fixed point iteration", **style1)
+    l2, = ax3.plot([], [], label="DeepONet", **style2)
+    l3, = ax3.plot([], [], label="FNO", **style3)
+    
+    fig.legend(handles=[l1, l2, l3], loc='lower center', ncol=3, fontsize=7,
+              frameon=True, fancybox=True, shadow=False,
+              bbox_to_anchor=(0.5, 0.00))
+    
+    # Adjust subplot parameters to prevent overlap
+    plt.subplots_adjust(
+        hspace=0.3,
+        left=0.1,
+        right=0.98,
+        top=0.86,
+        bottom=0.27,
+        wspace=0.5
+    )
+    
+    if savefig is not None:
+        abs_fig_path = (Path(__file__).parent.parent / f'media/{savefig}.png').resolve()
+        plt.savefig(abs_fig_path, dpi=300, bbox_inches='tight')
+    plt.show()
+
+
 if __name__ == '__main__':
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "times",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 10,
+        "font.size": 10,
+        # Make the legend/bel fonts a little smaller
+        "legend.fontsize": 8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+    }
+    plt.rcParams.update(tex_fonts)
+
     T, dt = 1, 0.01
     t = np.arange(0, T + dt, dt)
     n = len(t)
-    plot_trajectory_without_predictors(
+    plot_system_states_only(
         t,
         np.zeros((n,3)),np.zeros((n,3)),np.zeros((n,3)),
-        np.zeros((n,2)),np.zeros((n,2)),np.zeros((n,2)),
         savefig='single_trajectory_test'
     )
