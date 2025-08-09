@@ -342,11 +342,27 @@ def plot_system_states_only(
     ax1.set_xlabel("t", labelpad=1)
     ax1.set_ylabel(r"$x(t)$", labelpad=2)
 
+    if axis: 
+        axins = inset_axes(ax1, width="30%", height="30%", bbox_to_anchor=(-0.2, -0.2, 1,1),
+                       bbox_transform=ax1.transAxes, borderpad=0)
+        axins.plot(t, u_delay[:, 0], **style1)
+        axins.plot(t, u_delay_deeponet[:, 0], **style2)
+        axins.plot(t, u_delay_fno[:, 0], **style3)
+        
+        x1, x2 = 6, 7
+        y1, y2 = get_y_range_zoom(t, x1, x2, u_delay[:, 0])
+        axins.set_xlim(x1, x2)
+        axins.set_ylim(y1, y2)
+        axins.set_xticks([])
+        axins.set_yticks([])
+        mark_inset(ax1, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+
     ax2.plot(t, u_delay[:, 1], **style1)
     ax2.plot(t, u_delay_deeponet[:, 1], **style2)
     ax2.plot(t, u_delay_fno[:, 1], **style3)
     ax2.set_xlabel("t", labelpad=1)
     ax2.set_ylabel(r"$y(t)$", labelpad=2)
+    ax2.set_yticks([-0.25, 0, 0.25, 0.50, 0.75, 1.00])
     
     if axis: 
         axins = inset_axes(ax2, width="30%", height="30%", bbox_to_anchor=(-0.2, -0.2, 1,1),
@@ -369,8 +385,23 @@ def plot_system_states_only(
     ax3.set_xlabel("t", labelpad=1)
     ax3.set_ylabel(r"$\theta(t)$", labelpad=2)
 
-    # Add section title
-    fig.text(0.5, 0.92, "System states", va='center', ha='center', fontsize=14)
+    if axis: 
+        axins = inset_axes(ax3, width="30%", height="30%", bbox_to_anchor=(-0.2, -0.2, 1,1),
+                       bbox_transform=ax3.transAxes, borderpad=0)
+        axins.plot(t, u_delay[:, 2], **style1)
+        axins.plot(t, u_delay_deeponet[:, 2], **style2)
+        axins.plot(t, u_delay_fno[:, 2], **style3)
+        
+        x1, x2 = 5.5, 6
+        y1, y2 = get_y_range_zoom(t, x1, x2, u_delay[:, 2])
+        axins.set_xlim(x1, x2)
+        axins.set_ylim(y1, y2)
+        axins.set_xticks([])
+        axins.set_yticks([])
+        mark_inset(ax3, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+
+    # # Add section title
+    # fig.text(0.5, 0.92, "System states", va='center', ha='center', fontsize=14)
 
     # Add legend with more bottom padding
     l1, = ax3.plot([], [], label="Fixed point iteration", **style1)
@@ -386,8 +417,8 @@ def plot_system_states_only(
         hspace=0.3,
         left=0.1,
         right=0.98,
-        top=0.86,
-        bottom=0.27,
+        top=1.0,
+        bottom=0.29,
         wspace=0.5
     )
     
@@ -417,6 +448,6 @@ if __name__ == '__main__':
     n = len(t)
     plot_system_states_only(
         t,
-        np.zeros((n,3)),np.zeros((n,3)),np.zeros((n,3)),
-        savefig='single_trajectory_test'
+        np.ones((n,3)),np.ones((n,3)),np.ones((n,3)),
+        savefig='single_trajectory_test',
     )
